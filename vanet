@@ -1,0 +1,70 @@
+#include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/internet-module.h"
+#include "ns3/mobility-module.h"
+#include "ns3/ipv4-global-routing-helper.h"
+#include "ns3/sumo-module.h"
+
+using namespace ns3;
+
+NS_LOG_COMPONENT_DEFINE("VANETSimulation");
+
+int main(int argc, char *argv[])
+{
+    // 定义仿真时间
+    uint32_t simTime = 100; // seconds
+
+    // 创建节点容器
+    NodeContainer nodes;
+    nodes.Create(10); // 节点数量
+
+    // 设置车辆移动模型
+    MobilityHelper mobility;
+    mobility.SetPositionAllocator("ns3::RandomRectanglePositionAllocator",
+                                   "X", StringValue("ns3::UniformRandomVariable[Min=0|Max=2800]"),
+                                   "Y", StringValue("ns3::UniformRandomVariable[Min=0|Max=4]"));
+    mobility.SetMobilityModel("ns3::ConstantVelocityMobilityModel");
+    mobility.Install(nodes);
+
+    // 设置网络通信
+    InternetStackHelper stack;
+    stack.Install(nodes);
+
+    // 设置车辆间的通信范围
+    double txRange = 200.0; // meters
+
+    // 设置网络设备
+    YansWifiPhyHelper wifiPhy = YansWifiPhyHelper::Default();
+    YansWifiChannelHelper wifiChannel = YansWifiChannelHelper::Default();
+    wifiPhy.SetChannel(wifiChannel.Create());
+
+    WifiHelper wifi;
+    wifi.SetRemoteStationManager("ns3::ConstantRateWifiManager",
+                                 "DataMode", StringValue("OfdmRate6Mbps"),
+                                 "RtsCtsThreshold", UintegerValue(0));
+    wifi.SetStandard(WIFI_PHY_STANDARD_80211a);
+
+    NqosWifiMacHelper wifiMac = NqosWifiMacHelper::Default();
+    WifiMacHelper wifiMac = WifiMacHelper::Default();
+
+    // 安装设备
+    NetDeviceContainer devices = wifi.Install(wifiPhy, wifiMac, nodes);
+
+    // 安装网络协议栈
+    Ipv4AddressHelper address;
+    address.SetBase("192.168.1.0", "255.255.255.0");
+    Ipv4InterfaceContainer interfaces = address.Assign(devices);
+
+    // 从SUMO文件导入车辆移动数据
+    SumoHelper sumo;
+    sumo.Install(nodes);
+
+    // 设置仿真时间
+    Simulator::Stop(Seconds(simTime));
+
+    // 运行仿真
+    Simulator::Run();
+    Simulator::Destroy();
+
+    return 0;
+}
